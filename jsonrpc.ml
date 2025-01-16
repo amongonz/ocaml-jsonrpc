@@ -38,11 +38,12 @@ let invalid_params = { code = -32602L; message = "Invalid params"; data = None }
 let internal_error = { code = -32603L; message = "Internal error"; data = None }
 
 let error_jsont =
-  Jsont.Object.map (fun code message data -> { code; message; data })
-  |> Jsont.Object.mem "code" Jsont.int64 ~enc:(fun e -> e.code)
-  |> Jsont.Object.mem "message" Jsont.string ~enc:(fun e -> e.message)
-  |> Jsont.Object.opt_mem "data" Jsont.json ~enc:(fun e -> e.data)
-  |> Jsont.Object.finish
+  let open Jsont.Object in
+  map (fun code message data -> { code; message; data })
+  |> mem "code" Jsont.int64 ~enc:(fun e -> e.code)
+  |> mem "message" Jsont.string ~enc:(fun e -> e.message)
+  |> opt_mem "data" Jsont.json ~enc:(fun e -> e.data)
+  |> finish
 
 type _ message' =
   | Request : {
@@ -62,7 +63,8 @@ type request = [ `Request ] message'
 type response = [ `Response ] message'
 
 let message_jsont =
-  Jsont.Object.map ~kind:"JSON-RPC message"
+  let open Jsont.Object in
+  map ~kind:"JSON-RPC message"
     (fun `V2 method' params result error id : message ->
       match (method', result, error, id) with
       | Some method', None, None, _ -> Request { method'; params; id }
@@ -70,25 +72,23 @@ let message_jsont =
       | None, None, Some error, Some id -> Response { value = Error error; id }
       | _ ->
           Jsont.Error.msg Jsont.Meta.none "Ambiguous JSON-RPC message fields.")
-  |> Jsont.Object.mem "jsonrpc"
-       (Jsont.enum [ ("2.0", `V2) ])
-       ~enc:(Fun.const `V2)
-  |> Jsont.Object.opt_mem "method" Jsont.string ~enc:(function
+  |> mem "jsonrpc" (Jsont.enum [ ("2.0", `V2) ]) ~enc:(Fun.const `V2)
+  |> opt_mem "method" Jsont.string ~enc:(function
        | Request r -> Some r.method'
        | Response _ -> None)
-  |> Jsont.Object.opt_mem "params" structured_jsont ~enc:(function
+  |> opt_mem "params" structured_jsont ~enc:(function
        | Request r -> r.params
        | Response _ -> None)
-  |> Jsont.Object.opt_mem "result" Jsont.json ~enc:(function
+  |> opt_mem "result" Jsont.json ~enc:(function
        | Response { value = Ok value; _ } -> Some value
        | Request _ | Response { value = Error _; _ } -> None)
-  |> Jsont.Object.opt_mem "error" error_jsont ~enc:(function
+  |> opt_mem "error" error_jsont ~enc:(function
        | Response { value = Error error; _ } -> Some error
        | Request _ | Response { value = Ok _; _ } -> None)
-  |> Jsont.Object.opt_mem "id" id_jsont ~enc:(function
+  |> opt_mem "id" id_jsont ~enc:(function
        | Request r -> r.id
        | Response r -> Some r.id)
-  |> Jsont.Object.finish
+  |> finish
 
 type batch = message list
 
@@ -96,6 +96,7 @@ let batch_jsont = Jsont.list ~kind:"JSON-RPC batch" message_jsont
 
 let message_or_batch_jsont =
   let single = Jsont.map message_jsont ~dec:(fun msg -> [ msg ]) ~enc:List.hd in
+
   Jsont.any () ~dec_array:batch_jsont ~dec_object:single ~enc:(function
     | [ _ ] -> single
     | _ -> batch_jsont)
