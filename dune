@@ -1,4 +1,4 @@
 (library
  (public_name amongonz-jsonrpc)
- (name jsonrpc)
+ (name amongonz_jsonrpc)
  (libraries jsont))
