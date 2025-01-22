@@ -1,24 +1,33 @@
-type structured = Jsont.json
+type structured_json = Jsont.json
 
-let structured_jsont =
-  let enc = function
-    | Jsont.Object _ | Array _ -> Jsont.json
-    | _ -> invalid_arg "expected object or array"
-  in
-  Jsont.any ~kind:"object or array" ~dec_array:Jsont.json ~dec_object:Jsont.json
-    ~enc ()
+let is_structured_json = function
+  | Jsont.Object _ | Array _ -> true
+  | _ -> false
 
-type id = Jsont.json
+let structured_json json =
+  if not (is_structured_json json) then invalid_arg "expected object or array";
+  json
 
-let compare_id = Jsont.Json.compare
+let structured_json_jsont =
+  Jsont.any () ~kind:"object or array" ~dec_array:Jsont.json
+    ~dec_object:Jsont.json ~enc:(Fun.const Jsont.json)
 
-let id_jsont =
-  let enc = function
-    | Jsont.Null _ | String _ | Number _ -> Jsont.json
-    | _ -> invalid_arg "not a valid id value"
-  in
-  Jsont.any ~kind:"JSON-RPC request ID" ~dec_null:Jsont.json_null
-    ~dec_string:Jsont.json_string ~dec_number:Jsont.json_number ~enc ()
+type id_json = Jsont.json
+
+let is_id_json = function
+  | Jsont.Null _ | String _ | Number _ -> true
+  | _ -> false
+
+let id_json json =
+  if not (is_id_json json) then invalid_arg "expected request identifier";
+  json
+
+let compare_id_json = Jsont.Json.compare
+
+let id_json_jsont =
+  Jsont.any () ~kind:"JSON-RPC request ID" ~dec_null:Jsont.json_null
+    ~dec_string:Jsont.json_string ~dec_number:Jsont.json_number
+    ~enc:(Fun.const Jsont.json)
 
 type error = {
   code : int64;
@@ -48,13 +57,13 @@ let error_jsont =
 type _ message' =
   | Request : {
       method' : string;
-      params : structured option;
-      id : id option;
+      params : structured_json option;
+      id : id_json option;
     }
       -> [> `Request ] message'
   | Response : {
       value : (Jsont.json, error) result;
-      id : id;
+      id : id_json;
     }
       -> [> `Response ] message'
 
@@ -76,7 +85,7 @@ let message_jsont =
   |> opt_mem "method" Jsont.string ~enc:(function
        | Request r -> Some r.method'
        | Response _ -> None)
-  |> opt_mem "params" structured_jsont ~enc:(function
+  |> opt_mem "params" structured_json_jsont ~enc:(function
        | Request r -> r.params
        | Response _ -> None)
   |> opt_mem "result" Jsont.json ~enc:(function
@@ -85,7 +94,7 @@ let message_jsont =
   |> opt_mem "error" error_jsont ~enc:(function
        | Response { value = Error error; _ } -> Some error
        | Request _ | Response { value = Ok _; _ } -> None)
-  |> opt_mem "id" id_jsont ~enc:(function
+  |> opt_mem "id" id_json_jsont ~enc:(function
        | Request r -> r.id
        | Response r -> Some r.id)
   |> finish

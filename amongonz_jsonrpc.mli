@@ -6,19 +6,25 @@
 
 (** {1 Basic types} *)
 
-type structured = Jsont.json
+type structured_json = private Jsont.json
 (** Represents a JSON object or array. *)
 
-val structured_jsont : structured Jsont.t
+val structured_json : Jsont.json -> structured_json
+(** [structure json] is [json] ensuring it's an structured value. *)
 
-type id = Jsont.json
+val structured_json_jsont : structured_json Jsont.t
+
+type id_json = private Jsont.json
 (** Represents a request identifier. This ID should be considered opaque and
     forwarded from request to response. *)
 
-val compare_id : id -> id -> int
-(** [compare_id id1 id2] is a total order on request IDs. *)
+val id_json : Jsont.json -> id_json
+(** [id_json json] is [json] ensuring it's a valid request identifier. *)
 
-val id_jsont : id Jsont.t
+val compare_id_json : id_json -> id_json -> int
+(** [compare_id_json id1 id2] is a total order on request IDs. *)
+
+val id_json_jsont : id_json Jsont.t
 
 (** {1 Errors} *)
 
@@ -93,13 +99,13 @@ val error_jsont : error Jsont.t
 type _ message' =
   | Request : {
       method' : string;
-      params : structured option;
-      id : id option;
+      params : structured_json option;
+      id : id_json option;
     }
       -> [> `Request ] message'
   | Response : {
       value : (Jsont.json, error) result;
-      id : id;
+      id : id_json;
     }
       -> [> `Response ] message'
 
